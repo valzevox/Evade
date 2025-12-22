@@ -225,8 +225,8 @@ header.Position = Vector2.new(uiX, uiY)
 header.Size = Vector2.new(400, 35)
 header.Color = Color3.fromRGB(25, 25, 30)
 header.Filled = true
-bg.Visible = true
-bg.Transparency = 1
+header.Visible = true
+header.Transparency = 1
 header.ZIndex = 2
 
 local title = Drawing.new("Text")
@@ -249,7 +249,7 @@ button1.onClick = function()
     if autoFarmEnabled then
         button1.txt.Text = "Auto Farm: ON"
         button1.bg.Color = Color3.fromRGB(60, 220, 120)
-        print(" AUTO FARM ENABLED ")
+        print("AUTO FARM ENABLED")
         
         if not autoFarmRunning then
             autoFarmRunning = true
@@ -295,7 +295,7 @@ button1.onClick = function()
                                                     table.insert(damageTriggers, {
                                                         Position = pos,
                                                         Size = size,
-                                                        MaxDistance = math.max(size.X, size.Y, size.Z) + 5 -- Add 5 studs buffer
+                                                        MaxDistance = math.max(size.X, size.Y, size.Z) + 5
                                                     })
                                                 end
                                             end
@@ -304,16 +304,13 @@ button1.onClick = function()
                                 end
                             end
                             
-                            print("Found " .. #damageTriggers .. " damage trigger parts")
-                            
                             local positions = {}
                             
                             if safeZonesFolder then
                                 for _, obj in pairs(safeZonesFolder:GetDescendants()) do
                                     if obj.ClassName == "Part" or obj:IsA("BasePart") then
                                         local success, pos = pcall(function() return obj.Position end)
-                                        if success and pos.Y > 5 then -- Only include safezones with Y > 5
-                                            -- Check if this safezone is too close to any damage trigger
+                                        if success and pos.Y > 5 then
                                             local isSafe = true
                                             for _, trigger in pairs(damageTriggers) do
                                                 local distance = (pos - trigger.Position).Magnitude
@@ -331,15 +328,12 @@ button1.onClick = function()
                                 end
                                 
                                 if #positions > 0 then
-                                    print("Found " .. #positions .. " SafeZones with Y > 5 and away from damage triggers")
-                                    
                                     while autoFarmEnabled and character.Parent do
                                         for i, targetPosition in ipairs(positions) do
                                             if not autoFarmEnabled or not character.Parent then
                                                 break
                                             end
                                             
-                                            -- Check if target position is still safe
                                             local isTargetSafe = true
                                             for _, trigger in pairs(damageTriggers) do
                                                 local distance = (targetPosition - trigger.Position).Magnitude
@@ -350,7 +344,6 @@ button1.onClick = function()
                                             end
                                             
                                             if not isTargetSafe then
-                                                print("Target position is now unsafe, skipping...")
                                                 break
                                             end
                                             
@@ -365,7 +358,6 @@ button1.onClick = function()
                                             local startTime = os.clock()
                                             
                                             while autoFarmEnabled and character.Parent do
-                                                -- Check current position during movement
                                                 local isCurrentPathSafe = true
                                                 for _, trigger in pairs(damageTriggers) do
                                                     local distance = (hrp.Position - trigger.Position).Magnitude
@@ -376,7 +368,6 @@ button1.onClick = function()
                                                 end
                                                 
                                                 if not isCurrentPathSafe then
-                                                    print("Current path is unsafe, stopping movement...")
                                                     break
                                                 end
                                                 
@@ -403,18 +394,14 @@ button1.onClick = function()
                                         end
                                     end
                                 else
-                                    print("No SafeZones with Y > 5 and away from damage triggers found! Waiting 5 seconds...")
                                     wait(5)
                                 end
                             else
-                                print("SafeZones folder not found! Waiting 5 seconds...")
                                 wait(5)
                             end
                             
                             if not character.Parent then
-                                print("Player died. Waiting for respawn...")
                                 wait(5)
-                                print("Restarting farm loop")
                             end
                         else
                             wait(1)
@@ -425,13 +412,13 @@ button1.onClick = function()
                 end
                 
                 autoFarmRunning = false
-                print(" AUTO FARM DISABLED ")
+                print("AUTO FARM DISABLED")
             end);
         end
     else
         button1.txt.Text = "Auto Farm: OFF"
         button1.bg.Color = Color3.fromRGB(60, 120, 220)
-        print(" AUTO FARM DISABLED ")
+        print("AUTO FARM DISABLED")
     end
 end
 
@@ -447,7 +434,7 @@ button2.onClick = function()
     if autoTicketFarmEnabled then
         button2.txt.Text = "Auto Ticket: ON"
         button2.bg.Color = Color3.fromRGB(60, 220, 120)
-        print(" AUTO TICKET FARM ENABLED ")
+        print("AUTO TICKET FARM ENABLED")
         
         if not autoTicketFarmRunning then
             autoTicketFarmRunning = true
@@ -480,7 +467,6 @@ button2.onClick = function()
                             if effectsFolder then
                                 local ticketsFolder = effectsFolder:FindFirstChild("Tickets")
                                 if ticketsFolder then
-                                    printl("Found Tickets folder")
                                     return ticketsFolder
                                 end
                             end
@@ -494,7 +480,6 @@ button2.onClick = function()
                     if character then
                         local rootPart = ticket:FindFirstChild("HumanoidRootPart")
                         if rootPart and rootPart.Position then
-                            printl("Teleporting to ticket: " .. ticket.Name)
                             local offset = Vector3.new(0, 0, 0)
                             character.HumanoidRootPart.Position = rootPart.Position + offset
                             teleportedToSky = false
@@ -506,7 +491,6 @@ button2.onClick = function()
                     if not teleportedToSky then
                         local character = getCharacter()
                         if character and character.HumanoidRootPart.Position then
-                            printl("Teleporting to sky")
                             local offset = Vector3.new(0, 10000, 0)
                             character.HumanoidRootPart.Position = character.HumanoidRootPart.Position + offset
                             teleportedToSky = true
@@ -518,7 +502,6 @@ button2.onClick = function()
                     while autoTicketFarmEnabled do
                         local ticketsFolder = getTicketsFolder()
                         local tickets = ticketsFolder:GetChildren()
-                        printl("Number of tickets: " .. #tickets)
                         
                         if #tickets == 0 then
                             teleportToSky()
@@ -537,13 +520,13 @@ button2.onClick = function()
                 
                 checkForNewTickets()
                 autoTicketFarmRunning = false
-                print(" AUTO TICKET FARM DISABLED ")
+                print("AUTO TICKET FARM DISABLED")
             end);
         end
     else
         button2.txt.Text = "Auto Ticket: OFF"
         button2.bg.Color = Color3.fromRGB(60, 120, 220)
-        print(" AUTO TICKET FARM DISABLED ")
+        print("AUTO TICKET FARM DISABLED")
     end
 end
 
@@ -559,14 +542,14 @@ button3.onClick = function()
     if autoFarmTicketEnabled then
         button3.txt.Text = "Farm+Ticket: ON"
         button3.bg.Color = Color3.fromRGB(60, 220, 120)
-        print(" AUTO FARM + TICKET ENABLED ")
+        print("AUTO FARM + TICKET ENABLED")
         
         if not autoFarmTicketRunning then
             autoFarmTicketRunning = true
             
             spawn(function()
                 local player = game.Players.LocalPlayer
-                local currentMode = "Ticket" -- Start with ticket mode
+                local currentMode = "Ticket"
                 
                 repeat wait(0.1) until game.Workspace
                 
@@ -600,7 +583,6 @@ button3.onClick = function()
                     end
                 end
                 
-                -- Get damage trigger parts
                 local function getDamageTriggers()
                     local damageTriggers = {}
                     local workspace = game.Workspace
@@ -628,7 +610,7 @@ button3.onClick = function()
                                             table.insert(damageTriggers, {
                                                 Position = pos,
                                                 Size = size,
-                                                MaxDistance = math.max(size.X, size.Y, size.Z) + 5 -- Add 5 studs buffer
+                                                MaxDistance = math.max(size.X, size.Y, size.Z) + 5
                                             })
                                         end
                                     end
@@ -658,8 +640,7 @@ button3.onClick = function()
                         for _, obj in pairs(safeZonesFolder:GetDescendants()) do
                             if obj.ClassName == "Part" or obj:IsA("BasePart") then
                                 local success, pos = pcall(function() return obj.Position end)
-                                if success and pos.Y > 5 then -- Only include safezones with Y > 5
-                                    -- Check if this safezone is too close to any damage trigger
+                                if success and pos.Y > 5 then
                                     local isSafe = true
                                     for _, trigger in pairs(damageTriggers) do
                                         local distance = (pos - trigger.Position).Magnitude
@@ -685,16 +666,23 @@ button3.onClick = function()
                     if character then
                         local rootPart = ticket:FindFirstChild("HumanoidRootPart")
                         if rootPart and rootPart.Position then
-                            printl("Teleporting to ticket: " .. ticket.Name)
                             local offset = Vector3.new(0, 0, 0)
                             character.HumanoidRootPart.Position = rootPart.Position + offset
                         end
                     end
                 end
                 
-                -- Changed from tweening to teleporting
+                local function teleportToSky()
+                    local character = getCharacter()
+                    if character and character.HumanoidRootPart.Position then
+                        local offset = Vector3.new(0, 10000, 0)
+                        character.HumanoidRootPart.Position = character.HumanoidRootPart.Position + offset
+                        character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+                        character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    end
+                end
+                
                 local function farmMode(damageTriggers)
-                    printl("Switching to Farm Mode")
                     local positions = getSafeZones(damageTriggers)
                     
                     if #positions > 0 then
@@ -702,49 +690,49 @@ button3.onClick = function()
                         if character then
                             local hrp = character:FindFirstChild("HumanoidRootPart")
                             if hrp then
-                                while autoFarmTicketEnabled and character.Parent do
-                                    -- Pick a random safe zone
-                                    local targetPosition = positions[math.random(1, #positions)]
-                                    
-                                    -- Check if target position is safe
-                                    local isTargetSafe = true
-                                    for _, trigger in pairs(damageTriggers) do
-                                        local distance = (targetPosition - trigger.Position).Magnitude
-                                        if distance < trigger.MaxDistance then
-                                            isTargetSafe = false
-                                            break
-                                        end
+                                local targetPosition = positions[math.random(1, #positions)]
+                                
+                                local isTargetSafe = true
+                                for _, trigger in pairs(damageTriggers) do
+                                    local distance = (targetPosition - trigger.Position).Magnitude
+                                    if distance < trigger.MaxDistance then
+                                        isTargetSafe = false
+                                        break
                                     end
+                                end
+                                
+                                if isTargetSafe then
+                                    hrp.Position = targetPosition
+                                    hrp.Velocity = Vector3.new(0, 0, 0)
+                                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                                     
-                                    if isTargetSafe then
-                                        -- Teleport directly to the safe zone
-                                        hrp.Position = targetPosition
-                                        hrp.Velocity = Vector3.new(0, 0, 0)
-                                        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                                        
-                                        -- Wait a moment at each safe zone
-                                        wait(0.5)
-                                        
-                                        -- Check for tickets while farming
-                                        local ticketsFolder = getTicketsFolder()
-                                        local tickets = ticketsFolder:GetChildren()
-                                        if #tickets > 0 then
-                                            printl("New ticket detected! Switching to ticket mode.")
-                                            currentMode = "Ticket"
-                                            return
-                                        end
+                                    wait(0.5)
+                                    
+                                    local ticketsFolder = getTicketsFolder()
+                                    local tickets = ticketsFolder:GetChildren()
+                                    if #tickets > 0 then
+                                        currentMode = "Ticket"
+                                        return
                                     end
                                 end
                             end
                         end
                     else
-                        print("No SafeZones with Y > 5 and away from damage triggers found! Waiting 5 seconds...")
-                        wait(5)
+                        teleportToSky()
+                        wait(1)
+                        
+                        local ticketsFolder = getTicketsFolder()
+                        local tickets = ticketsFolder:GetChildren()
+                        if #tickets > 0 then
+                            currentMode = "Ticket"
+                            return
+                        end
                     end
+                    
+                    currentMode = "Ticket"
                 end
                 
                 local function ticketMode()
-                    printl("Switching to Ticket Mode")
                     local ticketsFolder = getTicketsFolder()
                     local tickets = ticketsFolder:GetChildren()
                     
@@ -752,28 +740,23 @@ button3.onClick = function()
                         for _, ticket in pairs(tickets) do
                             if ticket:IsA("Model") then
                                 teleportToTicket(ticket)
-                                wait(0.1) -- Reduced wait time from 0.5 to 0.1 for faster response
+                                wait(0.1)
                                 break
                             end
                         end
-                        currentMode = "Ticket"
                     else
                         currentMode = "Farm"
                     end
                 end
                 
-                -- Main loop with character respawn handling
                 while autoFarmTicketEnabled do
-                    -- Get fresh character reference each iteration
                     local character = getCharacter()
                     if not character then
                         wait(1)
-                        continue -- Skip to next iteration if character doesn't exist
+                        continue
                     end
                     
-                    -- Get fresh damage triggers and safe zones each round
                     local damageTriggers = getDamageTriggers()
-                    print("Found " .. #damageTriggers .. " damage trigger parts")
                     
                     if currentMode == "Ticket" then
                         ticketMode()
@@ -781,22 +764,21 @@ button3.onClick = function()
                         farmMode(damageTriggers)
                     end
                     
-                    wait(0.1) -- Reduced wait time from 1 to 0.1 for faster response
+                    wait(0.1)
                 end
                 
                 autoFarmTicketRunning = false
-                print(" AUTO FARM + TICKET DISABLED ")
+                print("AUTO FARM + TICKET DISABLED")
             end);
         end
     else
         button3.txt.Text = "Farm+Ticket: OFF"
         button3.bg.Color = Color3.fromRGB(60, 120, 220)
-        print(" AUTO FARM + TICKET DISABLED ")
+        print("AUTO FARM + TICKET DISABLED")
     end
 end
 
--- Button 4 placeholder for future functionality
-local button4 = CreateButton(uiX + 200, uiY + 60, 150, 30, "Button 4", function()
+CreateButton(uiX + 200, uiY + 60, 150, 30, "Button 4", function()
     print("Button 4 clicked!")
 end)
 
@@ -814,7 +796,6 @@ local dragOffsetY = 0
 
 spawn(function()
     local lastClick = false
-    print("Input loop started")
     while true do
         local clicked = ismouse1pressed()
         local mx, my = Mouse.X, Mouse.Y
@@ -824,7 +805,6 @@ spawn(function()
                 isDragging = true
                 dragOffsetX = mx - uiX
                 dragOffsetY = my - uiY
-                print("Started dragging")
             else
                 for _, btn in ipairs(buttons) do
                     if mx >= btn.x and mx <= btn.x + btn.w and my >= btn.y and my <= btn.y + btn.h then
@@ -867,5 +847,5 @@ spawn(function()
     end
 end)
 
-print(" UI LOADED ")
+print("UI LOADED")
 print("Tween speed: " .. _G.tweenSpeed .. " studs/sec")
