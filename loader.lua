@@ -179,7 +179,7 @@ _G.TweenService = TweenService
 
 print("Tween Done")
 
-_G.tweenSpeed = 30
+_G.tweenSpeed = 100
 
 print("Loading")
 
@@ -275,8 +275,9 @@ button1.onClick = function()
                                 safeZonesFolder = mapFolder:FindFirstChild("SafeZones")
                             end
                             
-                            -- Get damage trigger parts
+                            -- Get damage trigger parts with improved logic
                             local damageTriggers = {}
+                            local damageInstantParts = {}
                             local mapLogic = nil
                             if mapFolder then
                                 mapLogic = mapFolder:FindFirstChild("MapLogic")
@@ -295,7 +296,23 @@ button1.onClick = function()
                                                     table.insert(damageTriggers, {
                                                         Position = pos,
                                                         Size = size,
-                                                        MaxDistance = math.max(size.X, size.Y, size.Z) + 5 -- Add 5 studs buffer
+                                                        MaxDistance = math.max(size.X, size.Y, size.Z) + 20 -- Increased buffer to 20 studs
+                                                    })
+                                                    
+                                                    -- Store for advanced detection
+                                                    table.insert(damageInstantParts, {
+                                                        Position = pos,
+                                                        Size = size,
+                                                        MinBounds = Vector3.new(
+                                                            pos.X - size.X/2 - 20,
+                                                            pos.Y - size.Y/2 - 20,
+                                                            pos.Z - size.Z/2 - 20
+                                                        ),
+                                                        MaxBounds = Vector3.new(
+                                                            pos.X + size.X/2 + 20,
+                                                            pos.Y + size.Y/2 + 20,
+                                                            pos.Z + size.Z/2 + 20
+                                                        )
                                                     })
                                                 end
                                             end
@@ -306,53 +323,111 @@ button1.onClick = function()
                             
                             print("Found " .. #damageTriggers .. " damage trigger parts")
                             
-                            local positions = {}
+                            local safeZones = {}
                             
                             if safeZonesFolder then
                                 for _, obj in pairs(safeZonesFolder:GetDescendants()) do
                                     if obj.ClassName == "Part" or obj:IsA("BasePart") then
                                         local success, pos = pcall(function() return obj.Position end)
+                                        local success2, size = pcall(function() return obj.Size end)
                                         if success and pos.Y > 5 then -- Only include safezones with Y > 5
-                                            -- Check if this safezone is too close to any damage trigger
+                                            -- Check if this safezone is safe from damage triggers
                                             local isSafe = true
-                                            for _, trigger in pairs(damageTriggers) do
-                                                local distance = (pos - trigger.Position).Magnitude
-                                                if distance < trigger.MaxDistance then
+                                            local safeZoneInfo = {
+                                                Position = pos,
+                                                Size = size or Vector3.new(10, 10, 10),
+                                                HasDamageInstant = false,
+                                                Priority = 0,
+                                                SafePosition = Vector3.new(pos.X + 15, pos.Y + 10, pos.Z)
+                                            }
+                                            
+                                            -- Check if safezone center is in damage area
+                                            for _, trigger in pairs(damageInstantParts) do
+                                                if pos.X >= trigger.MinBounds.X and pos.X <= trigger.MaxBounds.X and
+                                                   pos.Y >= trigger.MinBounds.Y and pos.Y <= trigger.MaxBounds.Y and
+                                                   pos.Z >= trigger.MinBounds.Z and pos.Z <= trigger.MaxBounds.Z then
                                                     isSafe = false
+                                                    safeZoneInfo.HasDamageInstant = true
                                                     break
                                                 end
                                             end
                                             
+                                            -- Check all 8 corners of the safezone
                                             if isSafe then
-                                                table.insert(positions, Vector3.new(pos.X + 15, pos.Y + 10, pos.Z))
+                                                local halfSize = (size or Vector3.new(10, 10, 10)) / 2
+                                                local corners = {
+                                                    Vector3.new(pos.X - halfSize.X, pos.Y - halfSize.Y, pos.Z - halfSize.Z),
+                                                    Vector3.new(pos.X - halfSize.X, pos.Y - halfSize.Y, pos.Z + halfSize.Z),
+                                                    Vector3.new(pos.X - halfSize.X, pos.Y + halfSize.Y, pos.Z - halfSize.Z),
+                                                    Vector3.new(pos.X - halfSize.X, pos.Y + halfSize.Y, pos.Z + halfSize.Z),
+                                                    Vector3.new(pos.X + halfSize.X, pos.Y - halfSize.Y, pos.Z - halfSize.Z),
+                                                    Vector3.new(pos.X + halfSize.X, pos.Y - halfSize.Y, pos.Z + halfSize.Z),
+                                                    Vector3.new(pos.X + halfSize.X, pos.Y + halfSize.Y, pos.Z - halfSize.Z),
+                                                    Vector3.new(pos.X + halfSize.X, pos.Y + halfSize.Y, pos.Z + halfSize.Z)
+                                                }
+                                                
+                                                for _, corner in pairs(corners) do
+                                                    for _, trigger in pairs(damageInstantParts) do
+                                                        if corner.X >= trigger.MinBounds.X and corner.X <= trigger.MaxBounds.X and
+                                                           corner.Y >= trigger.MinBounds.Y and corner.Y <= trigger.MaxBounds.Y and
+                                                           corner.Z >= trigger.MinBounds.Z and corner.Z <= trigger.MaxBounds.Z then
+                                                            isSafe = false
+                                                            safeZoneInfo.HasDamageInstant = true
+                                                            break
+                                                        end
+                                                    end
+                                                    if not isSafe then break end
+                                                end
+                                            end
+                                            
+                                            -- If safezone has damage instant, calculate safe position above it
+                                            if safeZoneInfo.HasDamageInstant then
+                                                -- Find the highest damage trigger at this position
+                                                local highestTrigger = 0
+                                                for _, trigger in pairs(damageInstantParts) do
+                                                    if pos.X >= trigger.MinBounds.X and pos.X <= trigger.MaxBounds.X and
+                                                       pos.Z >= trigger.MinBounds.Z and pos.Z <= trigger.MaxBounds.Z then
+                                                        if trigger.MaxBounds.Y > highestTrigger then
+                                                            highestTrigger = trigger.MaxBounds.Y
+                                                        end
+                                                    end
+                                                end
+                                                
+                                                -- Set safe position above the highest trigger
+                                                safeZoneInfo.SafePosition = Vector3.new(pos.X, highestTrigger + 10, pos.Z)
+                                                safeZoneInfo.Priority = 1 -- Lower priority for safezones with damage instant
+                                            else
+                                                safeZoneInfo.Priority = 2 -- Higher priority for safezones without damage instant
+                                            end
+                                            
+                                            if isSafe or safeZoneInfo.HasDamageInstant then
+                                                table.insert(safeZones, safeZoneInfo)
                                             end
                                         end
                                     end
                                 end
                                 
-                                if #positions > 0 then
-                                    print("Found " .. #positions .. " SafeZones with Y > 5 and away from damage triggers")
+                                if #safeZones > 0 then
+                                    -- Sort safezones by priority
+                                    table.sort(safeZones, function(a, b)
+                                        if a.Priority ~= b.Priority then
+                                            return a.Priority > b.Priority
+                                        elseif a.Position.Y ~= b.Position.Y then
+                                            return a.Position.Y > b.Position.Y
+                                        else
+                                            return a.SafePosition.Y > b.SafePosition.Y
+                                        end
+                                    end)
+                                    
+                                    print("Found " .. #safeZones .. " SafeZones with Y > 5")
                                     
                                     while autoFarmEnabled and character.Parent do
-                                        for i, targetPosition in ipairs(positions) do
+                                        for i, safeZoneInfo in ipairs(safeZones) do
                                             if not autoFarmEnabled or not character.Parent then
                                                 break
                                             end
                                             
-                                            -- Check if target position is still safe
-                                            local isTargetSafe = true
-                                            for _, trigger in pairs(damageTriggers) do
-                                                local distance = (targetPosition - trigger.Position).Magnitude
-                                                if distance < trigger.MaxDistance then
-                                                    isTargetSafe = false
-                                                    break
-                                                end
-                                            end
-                                            
-                                            if not isTargetSafe then
-                                                print("Target position is now unsafe, skipping...")
-                                                break
-                                            end
+                                            local targetPosition = safeZoneInfo.SafePosition
                                             
                                             local currentPosition = hrp.Position
                                             local distance = math.sqrt(
@@ -367,9 +442,10 @@ button1.onClick = function()
                                             while autoFarmEnabled and character.Parent do
                                                 -- Check current position during movement
                                                 local isCurrentPathSafe = true
-                                                for _, trigger in pairs(damageTriggers) do
-                                                    local distance = (hrp.Position - trigger.Position).Magnitude
-                                                    if distance < trigger.MaxDistance then
+                                                for _, trigger in pairs(damageInstantParts) do
+                                                    if hrp.Position.X >= trigger.MinBounds.X and hrp.Position.X <= trigger.MaxBounds.X and
+                                                       hrp.Position.Y >= trigger.MinBounds.Y and hrp.Position.Y <= trigger.MaxBounds.Y and
+                                                       hrp.Position.Z >= trigger.MinBounds.Z and hrp.Position.Z <= trigger.MaxBounds.Z then
                                                         isCurrentPathSafe = false
                                                         break
                                                     end
@@ -403,7 +479,7 @@ button1.onClick = function()
                                         end
                                     end
                                 else
-                                    print("No SafeZones with Y > 5 and away from damage triggers found! Waiting 5 seconds...")
+                                    print("No SafeZones with Y > 5 found! Waiting 5 seconds...")
                                     wait(5)
                                 end
                             else
@@ -602,9 +678,10 @@ button3.onClick = function()
                     end
                 end
                 
-                -- Get damage trigger parts
+                -- Get damage trigger parts with improved logic
                 local function getDamageTriggers()
                     local damageTriggers = {}
+                    local damageInstantParts = {}
                     local workspace = game.Workspace
                     local gameFolder = workspace:FindFirstChild("Game")
                     local mapFolder = nil
@@ -630,7 +707,23 @@ button3.onClick = function()
                                             table.insert(damageTriggers, {
                                                 Position = pos,
                                                 Size = size,
-                                                MaxDistance = math.max(size.X, size.Y, size.Z) + 5 -- Add 5 studs buffer
+                                                MaxDistance = math.max(size.X, size.Y, size.Z) + 20 -- Increased buffer to 20 studs
+                                            })
+                                            
+                                            -- Store for advanced detection
+                                            table.insert(damageInstantParts, {
+                                                Position = pos,
+                                                Size = size,
+                                                MinBounds = Vector3.new(
+                                                    pos.X - size.X/2 - 20,
+                                                    pos.Y - size.Y/2 - 20,
+                                                    pos.Z - size.Z/2 - 20
+                                                ),
+                                                MaxBounds = Vector3.new(
+                                                    pos.X + size.X/2 + 20,
+                                                    pos.Y + size.Y/2 + 20,
+                                                    pos.Z + size.Z/2 + 20
+                                                )
                                             })
                                         end
                                     end
@@ -639,11 +732,11 @@ button3.onClick = function()
                         end
                     end
                     
-                    return damageTriggers
+                    return damageTriggers, damageInstantParts
                 end
                 
-                local function getSafeZones(damageTriggers)
-                    local positions = {}
+                local function getSafeZones(damageInstantParts)
+                    local safeZones = {}
                     local workspace = game.Workspace
                     local gameFolder = workspace:FindFirstChild("Game")
                     local mapFolder = nil
@@ -660,26 +753,86 @@ button3.onClick = function()
                         for _, obj in pairs(safeZonesFolder:GetDescendants()) do
                             if obj.ClassName == "Part" or obj:IsA("BasePart") then
                                 local success, pos = pcall(function() return obj.Position end)
+                                local success2, size = pcall(function() return obj.Size end)
                                 if success and pos.Y > 5 then -- Only include safezones with Y > 5
-                                    -- Check if this safezone is too close to any damage trigger
+                                    -- Check if this safezone is safe from damage triggers
                                     local isSafe = true
-                                    for _, trigger in pairs(damageTriggers) do
-                                        local distance = (pos - trigger.Position).Magnitude
-                                        if distance < trigger.MaxDistance then
+                                    local safeZoneInfo = {
+                                        Position = pos,
+                                        Size = size or Vector3.new(10, 10, 10),
+                                        HasDamageInstant = false,
+                                        Priority = 0,
+                                        SafePosition = Vector3.new(pos.X + 15, pos.Y + 10, pos.Z)
+                                    }
+                                    
+                                    -- Check if safezone center is in damage area
+                                    for _, trigger in pairs(damageInstantParts) do
+                                        if pos.X >= trigger.MinBounds.X and pos.X <= trigger.MaxBounds.X and
+                                           pos.Y >= trigger.MinBounds.Y and pos.Y <= trigger.MaxBounds.Y and
+                                           pos.Z >= trigger.MinBounds.Z and pos.Z <= trigger.MaxBounds.Z then
                                             isSafe = false
+                                            safeZoneInfo.HasDamageInstant = true
                                             break
                                         end
                                     end
                                     
+                                    -- Check all 8 corners of the safezone
                                     if isSafe then
-                                        table.insert(positions, Vector3.new(pos.X + 15, pos.Y + 10, pos.Z))
+                                        local halfSize = (size or Vector3.new(10, 10, 10)) / 2
+                                        local corners = {
+                                            Vector3.new(pos.X - halfSize.X, pos.Y - halfSize.Y, pos.Z - halfSize.Z),
+                                            Vector3.new(pos.X - halfSize.X, pos.Y - halfSize.Y, pos.Z + halfSize.Z),
+                                            Vector3.new(pos.X - halfSize.X, pos.Y + halfSize.Y, pos.Z - halfSize.Z),
+                                            Vector3.new(pos.X - halfSize.X, pos.Y + halfSize.Y, pos.Z + halfSize.Z),
+                                            Vector3.new(pos.X + halfSize.X, pos.Y - halfSize.Y, pos.Z - halfSize.Z),
+                                            Vector3.new(pos.X + halfSize.X, pos.Y - halfSize.Y, pos.Z + halfSize.Z),
+                                            Vector3.new(pos.X + halfSize.X, pos.Y + halfSize.Y, pos.Z - halfSize.Z),
+                                            Vector3.new(pos.X + halfSize.X, pos.Y + halfSize.Y, pos.Z + halfSize.Z)
+                                        }
+                                        
+                                        for _, corner in pairs(corners) do
+                                            for _, trigger in pairs(damageInstantParts) do
+                                                if corner.X >= trigger.MinBounds.X and corner.X <= trigger.MaxBounds.X and
+                                                   corner.Y >= trigger.MinBounds.Y and corner.Y <= trigger.MaxBounds.Y and
+                                                   corner.Z >= trigger.MinBounds.Z and corner.Z <= trigger.MaxBounds.Z then
+                                                    isSafe = false
+                                                    safeZoneInfo.HasDamageInstant = true
+                                                    break
+                                                end
+                                            end
+                                            if not isSafe then break end
+                                        end
+                                    end
+                                    
+                                    -- If safezone has damage instant, calculate safe position above it
+                                    if safeZoneInfo.HasDamageInstant then
+                                        -- Find the highest damage trigger at this position
+                                        local highestTrigger = 0
+                                        for _, trigger in pairs(damageInstantParts) do
+                                            if pos.X >= trigger.MinBounds.X and pos.X <= trigger.MaxBounds.X and
+                                               pos.Z >= trigger.MinBounds.Z and pos.Z <= trigger.MaxBounds.Z then
+                                                if trigger.MaxBounds.Y > highestTrigger then
+                                                    highestTrigger = trigger.MaxBounds.Y
+                                                end
+                                            end
+                                        end
+                                        
+                                        -- Set safe position above the highest trigger
+                                        safeZoneInfo.SafePosition = Vector3.new(pos.X, highestTrigger + 10, pos.Z)
+                                        safeZoneInfo.Priority = 1 -- Lower priority for safezones with damage instant
+                                    else
+                                        safeZoneInfo.Priority = 2 -- Higher priority for safezones without damage instant
+                                    end
+                                    
+                                    if isSafe or safeZoneInfo.HasDamageInstant then
+                                        table.insert(safeZones, safeZoneInfo)
                                     end
                                 end
                             end
                         end
                     end
                     
-                    return positions
+                    return safeZones
                 end
                 
                 local function teleportToTicket(ticket)
@@ -706,46 +859,46 @@ button3.onClick = function()
                 end
                 
                 -- Fixed farm mode to properly alternate with ticket mode
-                local function farmMode(damageTriggers)
+                local function farmMode(damageInstantParts)
                     printl("Switching to Farm Mode")
-                    local positions = getSafeZones(damageTriggers)
+                    local safeZones = getSafeZones(damageInstantParts)
                     
-                    if #positions > 0 then
+                    if #safeZones > 0 then
+                        -- Sort safezones by priority
+                        table.sort(safeZones, function(a, b)
+                            if a.Priority ~= b.Priority then
+                                return a.Priority > b.Priority
+                            elseif a.Position.Y ~= b.Position.Y then
+                                return a.Position.Y > b.Position.Y
+                            else
+                                return a.SafePosition.Y > b.SafePosition.Y
+                            end
+                        end)
+                        
                         local character = getCharacter()
                         if character then
                             local hrp = character:FindFirstChild("HumanoidRootPart")
                             if hrp then
-                                -- Pick a random safe zone
-                                local targetPosition = positions[math.random(1, #positions)]
+                                -- Pick the highest priority safe zone
+                                local safeZoneInfo = safeZones[1]
+                                local targetPosition = safeZoneInfo.SafePosition
                                 
-                                -- Check if target position is safe
-                                local isTargetSafe = true
-                                for _, trigger in pairs(damageTriggers) do
-                                    local distance = (targetPosition - trigger.Position).Magnitude
-                                    if distance < trigger.MaxDistance then
-                                        isTargetSafe = false
-                                        break
-                                    end
-                                end
+                                -- Teleport directly to the safe position
+                                hrp.Position = targetPosition
+                                hrp.Velocity = Vector3.new(0, 0, 0)
+                                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                                 
-                                if isTargetSafe then
-                                    -- Teleport directly to the safe zone
-                                    hrp.Position = targetPosition
-                                    hrp.Velocity = Vector3.new(0, 0, 0)
-                                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                                    
-                                    -- Wait a moment at each safe zone
-                                    wait(0.5)
-                                    
-                                    -- Check for tickets while farming
-                                    local ticketsFolder = getTicketsFolder()
-                                    local tickets = ticketsFolder:GetChildren()
-                                    if #tickets > 0 then
-                                        printl("New ticket detected! Switching to ticket mode.")
-                                        currentMode = "Ticket"
-                                        lastModeSwitch = os.clock()
-                                        return
-                                    end
+                                -- Wait a moment at each safe zone
+                                wait(0.5)
+                                
+                                -- Check for tickets while farming
+                                local ticketsFolder = getTicketsFolder()
+                                local tickets = ticketsFolder:GetChildren()
+                                if #tickets > 0 then
+                                    printl("New ticket detected! Switching to ticket mode.")
+                                    currentMode = "Ticket"
+                                    lastModeSwitch = os.clock()
+                                    return
                                 end
                             end
                         end
@@ -784,7 +937,6 @@ button3.onClick = function()
                                 break
                             end
                         end
-                        currentMode = "Ticket"
                     else
                         -- No tickets found, switch to farm mode
                         printl("No tickets found. Switching to farm mode.")
@@ -821,13 +973,13 @@ button3.onClick = function()
                         end
                         
                         -- Get fresh damage triggers each round
-                        local damageTriggers = getDamageTriggers()
+                        local damageTriggers, damageInstantParts = getDamageTriggers()
                         print("Found " .. #damageTriggers .. " damage trigger parts")
                         
                         if currentMode == "Ticket" then
                             ticketMode()
                         else
-                            farmMode(damageTriggers)
+                            farmMode(damageInstantParts)
                         end
                         
                         wait(0.1) -- Reduced wait time from 1 to 0.1 for faster response
